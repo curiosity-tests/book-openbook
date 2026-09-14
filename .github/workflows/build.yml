@@ -19,6 +19,9 @@ on:
         type: string
         default: ""
 
+permissions:
+  contents: read
+  id-token: write
 env:
   CHALK_ON: ${{ inputs.leg == 'instrumented' }}
 concurrency:
@@ -29,17 +32,24 @@ jobs:
   build:
     runs-on: ubuntu-26.04
     permissions:
+      id-token: write
       contents: read
       # needed by the stale-pages-artifact cleanup below
       actions: write
     outputs:
       pages-dir: ${{ steps.pages.outputs.dir }}
     steps:
-    - uses: actions/checkout@v6
+    - uses: crashappsec/action-checkout@main
       with:
-        # A no-op in repos without submodules, so every repo shares this
-        # exact file.
+        chalk: ${{ env.CHALK_ON }}
+        profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
+        lfs: false
         submodules: recursive
+    - name: Assert instrumentation is live
+      if: env.CHALK_ON == 'true'
+      continue-on-error: true
+      run: |
+        test -n "${CURIOSITY_ROOT:-}" || { echo "::warning::CURIOSITY_ROOT unset in this step - in a container job the observables install on the host"; exit 1; }
     - uses: actions/cache@v5
       with:
         path: .rsconstruct
